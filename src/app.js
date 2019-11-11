@@ -88,6 +88,10 @@ function init() {
     mouseHelper.visible = false;
     scene.add( mouseHelper );
 
+    controls.addEventListener("change", function() {
+
+    });
+
     window.addEventListener( 'resize', onWindowResize, false );
 
     var moved = false;
@@ -102,6 +106,7 @@ function init() {
 
 
     window.addEventListener( 'mouseup', function () {
+       
         checkIntersection();
         //if ( ! moved && intersection.intersects ) shoot();
     });
@@ -128,20 +133,35 @@ function init() {
         if ( ! mesh ) return;
         raycaster.setFromCamera( mouse, camera );
         var intersects = raycaster.intersectObjects( [ mesh ] );
+
         if ( intersects.length > 0 ) {
+
             var p = intersects[ 0 ].point;
-            mouseHelper.position.copy( p );
-            intersection.point.copy( p );
-            var n = intersects[ 0 ].face.normal.clone();
-            n.transformDirection( mesh.matrixWorld );
-            n.multiplyScalar( 10 );
-            n.add( intersects[ 0 ].point );
-            intersection.normal.copy( intersects[ 0 ].face.normal );
-            mouseHelper.lookAt( n );
-            var positions = line.geometry.attributes.position;
-            positions.setXYZ( 0, p.x, p.y, p.z );
-            positions.setXYZ( 1, n.x, n.y, n.z );
-            positions.needsUpdate = true;
+
+            var i = new THREE.Mesh(new THREE.SphereBufferGeometry(.2, 10, 10), new THREE.MeshLambertMaterial({
+                color: "#1ed36f"
+            }));
+
+            i.position.x = p.x;
+            i.position.y = p.y;
+            i.position.z = p.z;
+
+            scene.add(i);
+
+            // var p = intersects[ 0 ].point;
+
+            // mouseHelper.position.copy( p );
+            // intersection.point.copy( p );
+            // var n = intersects[ 0 ].face.normal.clone();
+            // n.transformDirection( mesh.matrixWorld );
+            // n.multiplyScalar( 10 );
+            // n.add( intersects[ 0 ].point );
+            // intersection.normal.copy( intersects[ 0 ].face.normal );
+            // mouseHelper.lookAt( n );
+            // var positions = line.geometry.attributes.position;
+            // positions.setXYZ( 0, p.x, p.y, p.z );
+            // positions.setXYZ( 1, n.x, n.y, n.z );
+            // positions.needsUpdate = true;
             intersection.intersects = true;
         } else {
             intersection.intersects = false;
@@ -151,7 +171,6 @@ function init() {
     onWindowResize();
     animate();
 }
-
 
 function loadLeePerrySmith() {
     var loader = new GLTFLoader();
