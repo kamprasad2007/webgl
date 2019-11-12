@@ -4,8 +4,7 @@ import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
 // import { DecalGeometry } from './jsm/geometries/DecalGeometry.js';
 
 var container = document.getElementById( 'container' );
-var renderer, scene, camera, stats;
-var mesh;
+var renderer, scene, camera, mesh;
 var raycaster;
 var line;
 var intersection = {
@@ -15,6 +14,9 @@ var intersection = {
 };
 var mouse = new THREE.Vector2();
 var textureLoader = new THREE.TextureLoader();
+var points = [];
+var s = new THREE.Raycaster;
+var ambientLight;
 
 // var decalDiffuse = textureLoader.load( 'textures/decal/decal-diffuse.png' );
 // var decalNormal = textureLoader.load( 'textures/decal/decal-normal.jpg' );
@@ -65,7 +67,9 @@ function init() {
     var controls = new OrbitControls( camera, renderer.domElement );
     controls.minDistance = 50;
     controls.maxDistance = 200;
-    scene.add( new THREE.AmbientLight( 0x443333 ) );
+
+    ambientLight = new THREE.AmbientLight( 0x443333 );
+    scene.add( ambientLight );
     
     var light = new THREE.DirectionalLight( 0xffddcc, 1 );
     light.position.set( 1, 0.75, 0.5 );
@@ -127,9 +131,8 @@ function init() {
         mouse.y = - ( y / window.innerHeight ) * 2 + 1;
         //checkIntersection();
     }
-
-
     function checkIntersection() {
+
         if ( ! mesh ) return;
         raycaster.setFromCamera( mouse, camera );
         var intersects = raycaster.intersectObjects( [ mesh ] );
@@ -137,31 +140,9 @@ function init() {
         if ( intersects.length > 0 ) {
 
             var p = intersects[ 0 ].point;
+            p.normal = intersects[ 0 ].face.normal.clone();
 
-            var i = new THREE.Mesh(new THREE.SphereBufferGeometry(.2, 10, 10), new THREE.MeshLambertMaterial({
-                color: "#1ed36f"
-            }));
-
-            i.position.x = p.x;
-            i.position.y = p.y;
-            i.position.z = p.z;
-
-            scene.add(i);
-
-            // var p = intersects[ 0 ].point;
-
-            // mouseHelper.position.copy( p );
-            // intersection.point.copy( p );
-            // var n = intersects[ 0 ].face.normal.clone();
-            // n.transformDirection( mesh.matrixWorld );
-            // n.multiplyScalar( 10 );
-            // n.add( intersects[ 0 ].point );
-            // intersection.normal.copy( intersects[ 0 ].face.normal );
-            // mouseHelper.lookAt( n );
-            // var positions = line.geometry.attributes.position;
-            // positions.setXYZ( 0, p.x, p.y, p.z );
-            // positions.setXYZ( 1, n.x, n.y, n.z );
-            // positions.needsUpdate = true;
+            addPoint(p);
             intersection.intersects = true;
         } else {
             intersection.intersects = false;
@@ -172,7 +153,19 @@ function init() {
     animate();
 }
 
+// function w() {
+//     // if (!l) return null;
+//     s.setFromCamera(h, n);
+//     let t = s.intersectObjects(r.children),
+//         i = null;
+//     return t.length > 0 && (i = {
+//         position: t[0].point,
+//         normal: t[0].face.normal.clone()
+//     }), i
+// }
+
 function loadLeePerrySmith() {
+
     var loader = new GLTFLoader();
     loader.load( 'models/gltf/LeePerrySmith/LeePerrySmith.glb', function ( gltf ) {
         mesh = gltf.scene.children[ 0 ];
@@ -188,27 +181,71 @@ function loadLeePerrySmith() {
     } );
 }
 
+function addPoint(p){
+    var i = new THREE.Mesh(new THREE.SphereBufferGeometry(.2, 8, 8,), new THREE.MeshLambertMaterial({
+        color: "#1ed36f"
+    }));
 
-// function shoot() {
-//     position.copy( intersection.point );
-//     orientation.copy( mouseHelper.rotation );
-//     if ( params.rotate ) orientation.z = Math.random() * 2 * Math.PI;
-//     var scale = params.minScale + Math.random() * ( params.maxScale - params.minScale );
-//     size.set( scale, scale, scale );
-//     var material = decalMaterial.clone();
-//     material.color.setHex( Math.random() * 0xffffff );
-//     var m = new THREE.Mesh( new DecalGeometry( mesh, position, orientation, size ), material );
-//     decals.push( m );
-//     scene.add( m );
-// }
+    i.position.x = p.x;
+    i.position.y = p.y;
+    i.position.z = p.z;
+    i.normal = p.normal;
+    scene.add(i);
 
+    points.push(i);
+    drawLine();
+}
 
-// function removeDecals() {
-//     decals.forEach( function ( d ) {
-//         scene.remove( d );
-//     } );
-//     decals = [];
-// }
+var f = 30;
+var curve = new THREE.CatmullRomCurve3([], !1, "chordal");
+var buffer = new THREE.BufferGeometry;
+var s = new THREE.Raycaster;
+function drawLine() {
+    if (points.length > 1) {
+
+        let n = [];
+        for (let i = 0; i < points.length; i++){
+            n.push(points[i].position);
+        }
+
+        curve.points = n;
+        let u = shortestPath(curve.getPoints((n.length - 1) * f));
+        buffer.setFromPoints(u);
+
+        !curve.mesh || scene.remove(curve.mesh);
+        let e = new THREE.LineBasicMaterial({
+            color: 255,
+            opacity: 1,
+            linewidth: 5
+        });
+        curve.mesh = new THREE.Line(buffer.clone(), e);
+        curve.mesh.castShadow = !0;
+        scene.add(curve.mesh);
+    } 
+    else {
+        scene.remove(curve.mesh);
+    }
+}
+
+function shortestPath(n) {
+    let i = [],
+        r = points.length;
+    for (let u = 0; u < r - 1; u++) {
+        let r = points[u],
+            e = points[u + 1],
+            h = e.normal.clone().sub(r.normal).divideScalar(f);
+        i.push(n[u * f]);
+        for (let t = 1; t < f; t++) {
+            let e = r.normal.clone().add(h.clone().multiplyScalar(t)),
+                c = e.clone().transformDirection(scene.matrixWorld);
+            c.multiplyScalar(10).add(n[u * f + t]);
+            s.set(c, e.clone().negate());
+            let l = s.intersectObjects(scene.children);
+            l.length > 0 && i.push(l[0].point)
+        }
+    }
+    return i
+}
 
 
 function onWindowResize() {
